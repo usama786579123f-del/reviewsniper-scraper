@@ -1,4 +1,4 @@
-"""
+ï»¿"""
 ReviewSniper - Lead Hunter
 ---------------------------
 Google Maps par ek niche + city search karta hai, listings kholta hai,
@@ -129,7 +129,7 @@ def scrape_niche(page, query: str, max_listings: int = 20):
     try:
         results_panel.wait_for(timeout=15000)
     except PWTimeout:
-        print("[WARN] Results panel not found — Google Maps ne layout change kiya ho sakta hai.")
+        print("[WARN] Results panel not found - Google Maps ne layout change kiya ho sakta hai.")
         return []
 
     listing_links = set()
@@ -240,7 +240,7 @@ def save_lead(db, lead: dict):
         print(f"[SKIP] Already saved: {lead['business_name']}")
         return
     leads.insert_one(lead)
-    print(f"[SAVED] {lead['business_name']} ({lead['stars']}?, {lead['hours_ago']}h ago)")
+    print(f"[SAVED] {lead['business_name']} ({lead['stars']}*, {lead['hours_ago']}h ago)")
 
 
 def run(query: str, max_listings: int):
