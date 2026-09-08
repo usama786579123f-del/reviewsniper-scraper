@@ -95,7 +95,7 @@ def scrape_niche(page, query: str, max_listings: int = 20):
 
     try:
         search_box = page.locator("#searchboxinput")
-        search_box.wait_for(state="visible", timeout=45000)
+        search_box.wait_for(state="visible", timeout=90000)
     except PWTimeout:
         # Save evidence so we can see what Google actually served us.
         page.screenshot(path="debug_maps_screen.png")
