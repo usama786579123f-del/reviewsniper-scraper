@@ -30,7 +30,6 @@ load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME", "reviewsniper")
 
-# Google Maps "time ago" text ko hours mein convert karne ke liye
 TIME_UNIT_TO_HOURS = {
     "minute": 1 / 60,
     "hour": 1,
@@ -51,7 +50,6 @@ def get_db():
 
 
 def parse_relative_time(text: str) -> float | None:
-    """'3 hours ago', 'a day ago', '2 weeks ago' -> hours (float) ya None."""
     text = text.lower().strip()
     match = re.search(r"(a|an|\d+)\s+(minute|hour|day|week)", text)
     if not match:
@@ -62,15 +60,11 @@ def parse_relative_time(text: str) -> float | None:
 
 
 def extract_star_rating(aria_label: str) -> int | None:
-    """Playwright element ka aria-label kuch is tarah hota hai: '3 stars'"""
     match = re.search(r"(\d+)\s+star", aria_label.lower())
     return int(match.group(1)) if match else None
 
 
 def dismiss_consent_screen(page):
-    """Google sometimes shows a cookie-consent interstitial ('Before you
-    continue to Google...') instead of Maps on the first visit. Click
-    through it if present so the real search box becomes available."""
     consent_buttons = [
         page.get_by_role("button", name=re.compile(r"^Accept all$", re.I)),
         page.get_by_role("button", name=re.compile(r"^I agree$", re.I)),
@@ -87,41 +81,60 @@ def dismiss_consent_screen(page):
             continue
 
 
+def find_search_box(page):
+    strategies = [
+        lambda: page.get_by_placeholder("Search Google Maps"),
+        lambda: page.locator("#searchboxinput"),
+        lambda: page.locator('input[aria-label="Search Google Maps"]'),
+        lambda: page.get_by_role("combobox", name=re.compile("Search Google Maps", re.I)),
+    ]
+    for build_locator in strategies:
+        try:
+            box = build_locator()
+            box.wait_for(state="visible", timeout=20000)
+            return box
+        except Exception:
+            continue
+    return None
+
+
 def scrape_niche(page, query: str, max_listings: int = 20):
     print(f"[INFO] Searching Google Maps: {query}")
-    page.goto("https://www.google.com/maps", timeout=90000, wait_until="domcontentloaded")
-    page.wait_for_timeout(4000)
-    dismiss_consent_screen(page)
 
-    try:
-        search_box = page.locator("#searchboxinput")
-        search_box.wait_for(state="visible", timeout=90000)
-    except PWTimeout:
-        # Save evidence so we can see what Google actually served us.
+    search_box = None
+    for attempt in range(1, 3):
+        page.goto("https://www.google.com/maps", timeout=90000, wait_until="domcontentloaded")
+        page.wait_for_timeout(4000)
+        dismiss_consent_screen(page)
+        search_box = find_search_box(page)
+        if search_box:
+            break
+        print(f"[WARN] Search box not found on attempt {attempt}, retrying...")
+
+    if not search_box:
         page.screenshot(path="debug_maps_screen.png")
         print(
-            "[FATAL] Search box never appeared. Saved a screenshot to "
-            "debug_maps_screen.png so you can see what page Google served."
+            "[FATAL] Search box never appeared after 2 attempts. Saved a "
+            "screenshot to debug_maps_screen.png so you can see what page "
+            "Google served."
         )
-        raise
+        raise RuntimeError("Search box not found")
 
     search_box.fill(query)
     search_box.press("Enter")
 
-    # Results panel load hone ka wait
     page.wait_for_timeout(4000)
 
-    # Left panel mein listings ko scroll kar ke load karo
     results_panel = page.locator('div[role="feed"]')
     try:
         results_panel.wait_for(timeout=15000)
     except PWTimeout:
-        print("[WARN] Results panel not found — Google Maps ne layout change kiya ho sakta hai.")
+        print("[WARN] Results panel not found � Google Maps ne layout change kiya ho sakta hai.")
         return []
 
     listing_links = set()
     prev_count = 0
-    for _ in range(6):  # scroll passes — increase for more results
+    for _ in range(6):
         cards = page.locator('div[role="feed"] a[href*="/maps/place/"]')
         count = cards.count()
         for i in range(count):
@@ -147,14 +160,12 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
         name_el = page.locator("h1").first
         business_name = name_el.inner_text(timeout=5000).strip() if name_el else "Unknown"
 
-        # Reviews tab par click karo
         reviews_tab = page.get_by_role("tab", name=re.compile("Reviews", re.I))
         if reviews_tab.count() == 0:
             return None
         reviews_tab.first.click()
         page.wait_for_timeout(2000)
 
-        # "Newest" sort select karo
         sort_button = page.get_by_role("button", name=re.compile("Sort", re.I))
         if sort_button.count() > 0:
             sort_button.first.click()
@@ -164,7 +175,6 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
                 newest_option.first.click()
                 page.wait_for_timeout(2000)
 
-        # Pehli (sabse nayi) review card check karo
         review_cards = page.locator('div[data-review-id]')
         if review_cards.count() == 0:
             return None
@@ -182,7 +192,7 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
             return None
 
         if stars not in TARGET_STARS or hours_ago > CRISIS_WINDOW_HOURS:
-            return None  # crisis nahi hai, skip
+            return None
 
         review_text_el = first_review.locator('span[jsan]').first
         review_text = ""
@@ -191,7 +201,6 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
         except Exception:
             pass
 
-        # Website link nikalo (email scraping Step 2 mein alag script se hoga)
         website = None
         website_btn = page.get_by_role("link", name=re.compile("Website", re.I))
         if website_btn.count() > 0:
@@ -231,15 +240,12 @@ def save_lead(db, lead: dict):
         print(f"[SKIP] Already saved: {lead['business_name']}")
         return
     leads.insert_one(lead)
-    print(f"[SAVED] {lead['business_name']} ({lead['stars']}★, {lead['hours_ago']}h ago)")
+    print(f"[SAVED] {lead['business_name']} ({lead['stars']}?, {lead['hours_ago']}h ago)")
 
 
 def run(query: str, max_listings: int):
     db = get_db()
     with sync_playwright() as p:
-        # Locally you can set HEADLESS=false in your terminal to WATCH the
-        # browser while debugging. On GitHub Actions there's no screen, so
-        # it always runs headless there (the default).
         headless = os.getenv("HEADLESS", "true").lower() != "false"
         browser = p.chromium.launch(headless=headless)
         context = browser.new_context(locale="en-US")
@@ -253,7 +259,7 @@ def run(query: str, max_listings: int):
             if lead:
                 save_lead(db, lead)
                 found += 1
-            time.sleep(1)  # thoda politeness delay
+            time.sleep(1)
 
         browser.close()
         print(f"[DONE] {found} crisis lead(s) saved out of {len(listing_links)} checked.")
