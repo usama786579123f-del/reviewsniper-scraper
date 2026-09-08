@@ -33,6 +33,14 @@ jobs:
         continue-on-error: true
         run: python lead_hunter.py --query "Dental Clinics in Dubai" --max-listings 20
 
+      - name: Upload debug screenshot (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshot
+          path: debug_maps_screen.png
+          if-no-files-found: ignore
+
       - name: Dubai — Plastic Surgeons
         continue-on-error: true
         run: python lead_hunter.py --query "Plastic Surgeons in Dubai" --max-listings 20
