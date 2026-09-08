@@ -121,7 +121,7 @@ def scrape_niche(page, query: str, max_listings: int = 20):
         raise RuntimeError("Search box not found")
 
     search_box.fill(query)
-    search_box.press("Enter")
+    page.keyboard.press("Enter")
 
     page.wait_for_timeout(4000)
 
