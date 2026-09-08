@@ -33,6 +33,26 @@ jobs:
         continue-on-error: true
         run: python lead_hunter.py --query "Dental Clinics in Dubai" --max-listings 20
 
+      - name: Dubai - Plastic Surgeons
+        continue-on-error: true
+        run: python lead_hunter.py --query "Plastic Surgeons in Dubai" --max-listings 20
+
+      - name: Dubai - Luxury Car Rentals
+        continue-on-error: true
+        run: python lead_hunter.py --query "Luxury Car Rentals in Dubai" --max-listings 20
+
+      - name: USA - HVAC Miami
+        continue-on-error: true
+        run: python lead_hunter.py --query "HVAC AC Repair in Miami" --max-listings 20
+
+      - name: USA - Personal Injury Lawyers Houston
+        continue-on-error: true
+        run: python lead_hunter.py --query "Personal Injury Lawyers in Houston" --max-listings 20
+
+      - name: USA - Roofers Dallas
+        continue-on-error: true
+        run: python lead_hunter.py --query "Roofers in Dallas" --max-listings 20
+
       - name: Upload debug screenshot (if any)
         if: always()
         uses: actions/upload-artifact@v4
