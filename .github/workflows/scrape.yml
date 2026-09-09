@@ -1,4 +1,4 @@
-﻿name: ReviewSniper Lead Hunter
+name: ReviewSniper Lead Hunter
 
 on:
   schedule:
@@ -8,7 +8,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     env:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
@@ -31,27 +31,35 @@ jobs:
 
       - name: Dubai - Dental Clinics
         continue-on-error: true
-        run: python lead_hunter.py --query "Dental Clinics in Dubai" --max-listings 20
+        run: python lead_hunter.py --query "Dental Clinics in Dubai" --max-listings 40
 
       - name: Dubai - Plastic Surgeons
         continue-on-error: true
-        run: python lead_hunter.py --query "Plastic Surgeons in Dubai" --max-listings 20
+        run: python lead_hunter.py --query "Plastic Surgeons in Dubai" --max-listings 40
 
       - name: Dubai - Luxury Car Rentals
         continue-on-error: true
-        run: python lead_hunter.py --query "Luxury Car Rentals in Dubai" --max-listings 20
+        run: python lead_hunter.py --query "Luxury Car Rentals in Dubai" --max-listings 40
+
+      - name: Dubai - Fine Dining Restaurants
+        continue-on-error: true
+        run: python lead_hunter.py --query "Fine Dining Restaurants in Dubai" --max-listings 40
 
       - name: USA - HVAC Miami
         continue-on-error: true
-        run: python lead_hunter.py --query "HVAC AC Repair in Miami" --max-listings 20
+        run: python lead_hunter.py --query "HVAC AC Repair in Miami" --max-listings 40
 
       - name: USA - Personal Injury Lawyers Houston
         continue-on-error: true
-        run: python lead_hunter.py --query "Personal Injury Lawyers in Houston" --max-listings 20
+        run: python lead_hunter.py --query "Personal Injury Lawyers in Houston" --max-listings 40
 
       - name: USA - Roofers Dallas
         continue-on-error: true
-        run: python lead_hunter.py --query "Roofers in Dallas" --max-listings 20
+        run: python lead_hunter.py --query "Roofers in Dallas" --max-listings 40
+
+      - name: USA - Dental Clinics Miami
+        continue-on-error: true
+        run: python lead_hunter.py --query "Dental Clinics in Miami" --max-listings 40
 
       - name: Upload debug screenshot (if any)
         if: always()

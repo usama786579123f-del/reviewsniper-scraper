@@ -1,4 +1,4 @@
-﻿"""
+"""
 ReviewSniper - Lead Hunter
 ---------------------------
 Google Maps par ek niche + city search karta hai, listings kholta hai,
@@ -37,7 +37,7 @@ TIME_UNIT_TO_HOURS = {
     "week": 24 * 7,
 }
 
-CRISIS_WINDOW_HOURS = 24
+CRISIS_WINDOW_HOURS = 48
 TARGET_STARS = {1, 2}
 
 
