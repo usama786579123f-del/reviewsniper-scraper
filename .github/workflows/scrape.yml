@@ -8,7 +8,197 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 15
+      matrix:
+        include:
+          - query: "Dental Clinics in New York"
+          - query: "Restaurants in New York"
+          - query: "Hotels in New York"
+          - query: "Real Estate Agencies in New York"
+          - query: "Car Rentals in New York"
+          - query: "Dental Clinics in Los Angeles"
+          - query: "Restaurants in Los Angeles"
+          - query: "Hotels in Los Angeles"
+          - query: "Real Estate Agencies in Los Angeles"
+          - query: "Car Rentals in Los Angeles"
+          - query: "Dental Clinics in Chicago"
+          - query: "Restaurants in Chicago"
+          - query: "Hotels in Chicago"
+          - query: "Real Estate Agencies in Chicago"
+          - query: "Car Rentals in Chicago"
+          - query: "Dental Clinics in Houston"
+          - query: "Restaurants in Houston"
+          - query: "Hotels in Houston"
+          - query: "Real Estate Agencies in Houston"
+          - query: "Car Rentals in Houston"
+          - query: "Dental Clinics in Miami"
+          - query: "Restaurants in Miami"
+          - query: "Hotels in Miami"
+          - query: "Real Estate Agencies in Miami"
+          - query: "Car Rentals in Miami"
+          - query: "Dental Clinics in London"
+          - query: "Restaurants in London"
+          - query: "Hotels in London"
+          - query: "Real Estate Agencies in London"
+          - query: "Car Rentals in London"
+          - query: "Dental Clinics in Manchester"
+          - query: "Restaurants in Manchester"
+          - query: "Hotels in Manchester"
+          - query: "Real Estate Agencies in Manchester"
+          - query: "Car Rentals in Manchester"
+          - query: "Dental Clinics in Birmingham"
+          - query: "Restaurants in Birmingham"
+          - query: "Hotels in Birmingham"
+          - query: "Real Estate Agencies in Birmingham"
+          - query: "Car Rentals in Birmingham"
+          - query: "Dental Clinics in Liverpool"
+          - query: "Restaurants in Liverpool"
+          - query: "Hotels in Liverpool"
+          - query: "Real Estate Agencies in Liverpool"
+          - query: "Car Rentals in Liverpool"
+          - query: "Dental Clinics in Leeds"
+          - query: "Restaurants in Leeds"
+          - query: "Hotels in Leeds"
+          - query: "Real Estate Agencies in Leeds"
+          - query: "Car Rentals in Leeds"
+          - query: "Dental Clinics in Paris"
+          - query: "Restaurants in Paris"
+          - query: "Hotels in Paris"
+          - query: "Real Estate Agencies in Paris"
+          - query: "Car Rentals in Paris"
+          - query: "Dental Clinics in Marseille"
+          - query: "Restaurants in Marseille"
+          - query: "Hotels in Marseille"
+          - query: "Real Estate Agencies in Marseille"
+          - query: "Car Rentals in Marseille"
+          - query: "Dental Clinics in Lyon"
+          - query: "Restaurants in Lyon"
+          - query: "Hotels in Lyon"
+          - query: "Real Estate Agencies in Lyon"
+          - query: "Car Rentals in Lyon"
+          - query: "Dental Clinics in Nice"
+          - query: "Restaurants in Nice"
+          - query: "Hotels in Nice"
+          - query: "Real Estate Agencies in Nice"
+          - query: "Car Rentals in Nice"
+          - query: "Dental Clinics in Toulouse"
+          - query: "Restaurants in Toulouse"
+          - query: "Hotels in Toulouse"
+          - query: "Real Estate Agencies in Toulouse"
+          - query: "Car Rentals in Toulouse"
+          - query: "Dental Clinics in Berlin"
+          - query: "Restaurants in Berlin"
+          - query: "Hotels in Berlin"
+          - query: "Real Estate Agencies in Berlin"
+          - query: "Car Rentals in Berlin"
+          - query: "Dental Clinics in Munich"
+          - query: "Restaurants in Munich"
+          - query: "Hotels in Munich"
+          - query: "Real Estate Agencies in Munich"
+          - query: "Car Rentals in Munich"
+          - query: "Dental Clinics in Hamburg"
+          - query: "Restaurants in Hamburg"
+          - query: "Hotels in Hamburg"
+          - query: "Real Estate Agencies in Hamburg"
+          - query: "Car Rentals in Hamburg"
+          - query: "Dental Clinics in Frankfurt"
+          - query: "Restaurants in Frankfurt"
+          - query: "Hotels in Frankfurt"
+          - query: "Real Estate Agencies in Frankfurt"
+          - query: "Car Rentals in Frankfurt"
+          - query: "Dental Clinics in Cologne"
+          - query: "Restaurants in Cologne"
+          - query: "Hotels in Cologne"
+          - query: "Real Estate Agencies in Cologne"
+          - query: "Car Rentals in Cologne"
+          - query: "Dental Clinics in Rome"
+          - query: "Restaurants in Rome"
+          - query: "Hotels in Rome"
+          - query: "Real Estate Agencies in Rome"
+          - query: "Car Rentals in Rome"
+          - query: "Dental Clinics in Milan"
+          - query: "Restaurants in Milan"
+          - query: "Hotels in Milan"
+          - query: "Real Estate Agencies in Milan"
+          - query: "Car Rentals in Milan"
+          - query: "Dental Clinics in Naples"
+          - query: "Restaurants in Naples"
+          - query: "Hotels in Naples"
+          - query: "Real Estate Agencies in Naples"
+          - query: "Car Rentals in Naples"
+          - query: "Dental Clinics in Turin"
+          - query: "Restaurants in Turin"
+          - query: "Hotels in Turin"
+          - query: "Real Estate Agencies in Turin"
+          - query: "Car Rentals in Turin"
+          - query: "Dental Clinics in Florence"
+          - query: "Restaurants in Florence"
+          - query: "Hotels in Florence"
+          - query: "Real Estate Agencies in Florence"
+          - query: "Car Rentals in Florence"
+          - query: "Dental Clinics in Istanbul"
+          - query: "Restaurants in Istanbul"
+          - query: "Hotels in Istanbul"
+          - query: "Real Estate Agencies in Istanbul"
+          - query: "Car Rentals in Istanbul"
+          - query: "Dental Clinics in Ankara"
+          - query: "Restaurants in Ankara"
+          - query: "Hotels in Ankara"
+          - query: "Real Estate Agencies in Ankara"
+          - query: "Car Rentals in Ankara"
+          - query: "Dental Clinics in Izmir"
+          - query: "Restaurants in Izmir"
+          - query: "Hotels in Izmir"
+          - query: "Real Estate Agencies in Izmir"
+          - query: "Car Rentals in Izmir"
+          - query: "Dental Clinics in Antalya"
+          - query: "Restaurants in Antalya"
+          - query: "Hotels in Antalya"
+          - query: "Real Estate Agencies in Antalya"
+          - query: "Car Rentals in Antalya"
+          - query: "Dental Clinics in Bursa"
+          - query: "Restaurants in Bursa"
+          - query: "Hotels in Bursa"
+          - query: "Real Estate Agencies in Bursa"
+          - query: "Car Rentals in Bursa"
+          - query: "Dental Clinics in Moscow"
+          - query: "Restaurants in Moscow"
+          - query: "Hotels in Moscow"
+          - query: "Real Estate Agencies in Moscow"
+          - query: "Car Rentals in Moscow"
+          - query: "Dental Clinics in Saint Petersburg"
+          - query: "Restaurants in Saint Petersburg"
+          - query: "Hotels in Saint Petersburg"
+          - query: "Real Estate Agencies in Saint Petersburg"
+          - query: "Car Rentals in Saint Petersburg"
+          - query: "Dental Clinics in Novosibirsk"
+          - query: "Restaurants in Novosibirsk"
+          - query: "Hotels in Novosibirsk"
+          - query: "Real Estate Agencies in Novosibirsk"
+          - query: "Car Rentals in Novosibirsk"
+          - query: "Dental Clinics in Yekaterinburg"
+          - query: "Restaurants in Yekaterinburg"
+          - query: "Hotels in Yekaterinburg"
+          - query: "Real Estate Agencies in Yekaterinburg"
+          - query: "Car Rentals in Yekaterinburg"
+          - query: "Dental Clinics in Kazan"
+          - query: "Restaurants in Kazan"
+          - query: "Hotels in Kazan"
+          - query: "Real Estate Agencies in Kazan"
+          - query: "Car Rentals in Kazan"
+          - query: "Dental Clinics in Dubai"
+          - query: "Restaurants in Dubai"
+          - query: "Hotels in Dubai"
+          - query: "Real Estate Agencies in Dubai"
+          - query: "Car Rentals in Dubai"
+          - query: "Dental Clinics in Abu Dhabi"
+          - query: "Restaurants in Abu Dhabi"
+          - query: "Hotels in Abu Dhabi"
+          - query: "Real Estate Agencies in Abu Dhabi"
+          - query: "Car Rentals in Abu Dhabi"
 
     env:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
@@ -29,42 +219,14 @@ jobs:
       - name: Install Playwright's Chromium browser
         run: playwright install --with-deps chromium
 
-      - name: Dubai - Dental Clinics
+      - name: Scrape ${{ matrix.query }}
         continue-on-error: true
-        run: python lead_hunter.py --query "Dental Clinics in Dubai" --max-listings 40
-
-      - name: Dubai - Plastic Surgeons
-        continue-on-error: true
-        run: python lead_hunter.py --query "Plastic Surgeons in Dubai" --max-listings 40
-
-      - name: Dubai - Luxury Car Rentals
-        continue-on-error: true
-        run: python lead_hunter.py --query "Luxury Car Rentals in Dubai" --max-listings 40
-
-      - name: Dubai - Fine Dining Restaurants
-        continue-on-error: true
-        run: python lead_hunter.py --query "Fine Dining Restaurants in Dubai" --max-listings 40
-
-      - name: USA - HVAC Miami
-        continue-on-error: true
-        run: python lead_hunter.py --query "HVAC AC Repair in Miami" --max-listings 40
-
-      - name: USA - Personal Injury Lawyers Houston
-        continue-on-error: true
-        run: python lead_hunter.py --query "Personal Injury Lawyers in Houston" --max-listings 40
-
-      - name: USA - Roofers Dallas
-        continue-on-error: true
-        run: python lead_hunter.py --query "Roofers in Dallas" --max-listings 40
-
-      - name: USA - Dental Clinics Miami
-        continue-on-error: true
-        run: python lead_hunter.py --query "Dental Clinics in Miami" --max-listings 40
+        run: python lead_hunter.py --query "${{ matrix.query }}" --max-listings 30
 
       - name: Upload debug screenshot (if any)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-screenshot
+          name: debug-screenshot-${{ strategy.job-index }}
           path: debug_maps_screen.png
           if-no-files-found: ignore
