@@ -16,6 +16,7 @@ ENV VARS (.env file mein daalo, GitHub Actions mein secrets se):
 
 import argparse
 import os
+import random
 import re
 import sys
 import time
@@ -40,6 +41,11 @@ TIME_UNIT_TO_HOURS = {
 CRISIS_WINDOW_HOURS = 48
 TARGET_STARS = {1, 2}
 
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
 
 def get_db():
     if not MONGODB_URI:
@@ -47,6 +53,22 @@ def get_db():
         sys.exit(1)
     client = MongoClient(MONGODB_URI)
     return client[DB_NAME]
+
+
+def save_debug(page, tag: str):
+    """Har failure point par screenshot + full page HTML dono save karo,
+    taake agla run dekh kar pata chal sake Google ne asal mein kya
+    dikhaya tha (normal maps, consent wall, ya bot-check page)."""
+    try:
+        page.screenshot(path=f"debug_{tag}.png")
+    except Exception:
+        pass
+    try:
+        with open(f"debug_{tag}.html", "w", encoding="utf-8") as f:
+            f.write(page.content())
+    except Exception:
+        pass
+    print(f"[DEBUG] Saved debug_{tag}.png and debug_{tag}.html")
 
 
 def parse_relative_time(text: str) -> float | None:
@@ -112,11 +134,10 @@ def scrape_niche(page, query: str, max_listings: int = 20):
         print(f"[WARN] Search box not found on attempt {attempt}, retrying...")
 
     if not search_box:
-        page.screenshot(path="debug_maps_screen.png")
+        save_debug(page, "no_searchbox")
         print(
-            "[FATAL] Search box never appeared after 2 attempts. Saved a "
-            "screenshot to debug_maps_screen.png so you can see what page "
-            "Google served."
+            "[FATAL] Search box never appeared after 2 attempts. Debug "
+            "files saved so you can see what page Google served."
         )
         raise RuntimeError("Search box not found")
 
@@ -129,7 +150,8 @@ def scrape_niche(page, query: str, max_listings: int = 20):
     try:
         results_panel.wait_for(timeout=15000)
     except PWTimeout:
-        print("[WARN] Results panel not found - Google Maps ne layout change kiya ho sakta hai.")
+        save_debug(page, "no_results_panel")
+        print("[WARN] Results panel not found - Google Maps ne layout change kiya ho sakta hai, ya block screen dikha rahi hai.")
         return []
 
     listing_links = set()
@@ -244,11 +266,25 @@ def save_lead(db, lead: dict):
 
 
 def run(query: str, max_listings: int):
+    # Sab matrix jobs ek hi second par Google Maps na maarein, is liye
+    # thoda random jitter (0-8 seconds) start mein daal do.
+    time.sleep(random.uniform(0, 8))
+
     db = get_db()
     with sync_playwright() as p:
         headless = os.getenv("HEADLESS", "true").lower() != "false"
-        browser = p.chromium.launch(headless=headless)
-        context = browser.new_context(locale="en-US")
+        browser = p.chromium.launch(
+            headless=headless,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+            ],
+        )
+        context = browser.new_context(
+            locale="en-US",
+            user_agent=USER_AGENT,
+            viewport={"width": 1366, "height": 768},
+        )
         page = context.new_page()
 
         listing_links = scrape_niche(page, query, max_listings=max_listings)

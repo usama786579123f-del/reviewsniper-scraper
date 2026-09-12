@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 15
+      max-parallel: 4
       matrix:
         include:
           - query: "Dental Clinics in New York"
@@ -297,10 +297,12 @@ jobs:
         continue-on-error: true
         run: python lead_hunter.py --query "${{ matrix.query }}" --max-listings 30
 
-      - name: Upload debug screenshot (if any)
+      - name: Upload debug artifacts (if any)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-screenshot-${{ strategy.job-index }}
-          path: debug_maps_screen.png
+          name: debug-${{ strategy.job-index }}
+          path: |
+            debug_*.png
+            debug_*.html
           if-no-files-found: ignore
