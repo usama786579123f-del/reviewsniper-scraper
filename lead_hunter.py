@@ -15,11 +15,14 @@ ENV VARS (.env file mein daalo, GitHub Actions mein secrets se):
 """
 
 import argparse
+import json
 import os
 import random
 import re
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
@@ -30,6 +33,10 @@ load_dotenv()
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME", "reviewsniper")
+
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+ALERT_EMAIL_FROM = os.getenv("ALERT_EMAIL_FROM")
+ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO")
 
 TIME_UNIT_TO_HOURS = {
     "minute": 1 / 60,
@@ -255,6 +262,72 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
         return None
 
 
+def send_alert_email(lead: dict) -> tuple[bool, str]:
+    """Brevo ke Transactional Email API se ek alert email bhejta hai.
+    Return: (success, error_message). Agar keys set nahi hain to
+    (False, "not configured") deta hai, taake caller graceful handle kar sake."""
+    if not (BREVO_API_KEY and ALERT_EMAIL_FROM and ALERT_EMAIL_TO):
+        return False, "BREVO_API_KEY / ALERT_EMAIL_FROM / ALERT_EMAIL_TO env vars missing"
+
+    subject = f"[ReviewSniper] New crisis lead: {lead['business_name']} ({lead['stars']} star)"
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; font-size: 14px; color: #222;">
+      <h2 style="margin-bottom: 4px;">New Crisis Lead Found</h2>
+      <p><strong>Business:</strong> {lead['business_name']}</p>
+      <p><strong>Niche:</strong> {lead['niche']}</p>
+      <p><strong>Rating:</strong> {lead['stars']} star ({lead['hours_ago']}h ago)</p>
+      <p><strong>Review:</strong> {lead['review_text'] or '(no text)'}</p>
+      <p><strong>Phone:</strong> {lead['phone'] or 'N/A'}</p>
+      <p><strong>Website:</strong> {lead['website'] or 'N/A'}</p>
+      <p><a href="{lead['maps_url']}">View on Google Maps</a></p>
+    </div>
+    """
+
+    payload = {
+        "sender": {"email": ALERT_EMAIL_FROM, "name": "ReviewSniper Alerts"},
+        "to": [{"email": ALERT_EMAIL_TO}],
+        "subject": subject,
+        "htmlContent": html_content,
+    }
+
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read()
+        return True, ""
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return False, f"HTTP {e.code}: {body}"
+    except Exception as e:
+        return False, str(e)
+
+
+def log_email_alert(db, lead: dict, success: bool, error: str = ""):
+    """Har email attempt (kamyaab ya nakaam) ko 'email_alerts' collection
+    mein save karta hai, taake EmailAlerts.tsx real history dikha sake."""
+    db["email_alerts"].insert_one(
+        {
+            "business_name": lead["business_name"],
+            "niche": lead["niche"],
+            "maps_url": lead["maps_url"],
+            "recipient": ALERT_EMAIL_TO or "",
+            "status": "sent" if success else "failed",
+            "error": error,
+            "sent_at": datetime.now(timezone.utc),
+        }
+    )
+
+
 def save_lead(db, lead: dict):
     leads = db["leads"]
     existing = leads.find_one({"maps_url": lead["maps_url"], "review_text": lead["review_text"]})
@@ -263,6 +336,13 @@ def save_lead(db, lead: dict):
         return
     leads.insert_one(lead)
     print(f"[SAVED] {lead['business_name']} ({lead['stars']}*, {lead['hours_ago']}h ago)")
+
+    success, error = send_alert_email(lead)
+    log_email_alert(db, lead, success, error)
+    if success:
+        print(f"[EMAIL] Alert sent for {lead['business_name']}")
+    else:
+        print(f"[EMAIL] Alert NOT sent for {lead['business_name']}: {error}")
 
 
 def run(query: str, max_listings: int):
