@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  scrape:
+  scrape_part1:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -147,6 +147,48 @@ jobs:
           - query: "Car Rentals in Frankfurt"
           - query: "Personal Injury Lawyers in Frankfurt"
           - query: "Plastic Surgeons in Frankfurt"
+
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      DB_NAME: reviewsniper
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright's Chromium browser
+        run: playwright install --with-deps chromium
+
+      - name: Scrape ${{ matrix.query }}
+        continue-on-error: true
+        run: python lead_hunter.py --query "${{ matrix.query }}" --max-listings 30
+
+      - name: Upload debug artifacts (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-part1-${{ strategy.job-index }}
+          path: |
+            debug_*.png
+            debug_*.html
+          if-no-files-found: ignore
+
+  scrape_part2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
           - query: "Dental Clinics in Cologne"
           - query: "Restaurants in Cologne"
           - query: "Hotels in Cologne"
@@ -301,7 +343,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-${{ strategy.job-index }}
+          name: debug-part2-${{ strategy.job-index }}
           path: |
             debug_*.png
             debug_*.html
