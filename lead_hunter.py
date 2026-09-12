@@ -181,6 +181,56 @@ def scrape_niche(page, query: str, max_listings: int = 20):
     return listing_links
 
 
+def get_phone_number(page) -> str | None:
+    """Google Maps ka phone number nikalta hai, 4 alag strategies try kar ke
+    (search box wale style mein). Jaise hi ek kaam kar jaye, wahin ruk jata hai."""
+
+    # Strategy 1: sabse aam format - button jiska data-item-id "phone:" se shuru hota hai
+    try:
+        btn = page.locator('button[data-item-id^="phone:"]')
+        if btn.count() > 0:
+            label = btn.first.get_attribute("aria-label") or ""
+            label = label.replace("Phone:", "").strip()
+            if label:
+                return label
+    except Exception:
+        pass
+
+    # Strategy 2: kabhi kabhi ye button ki jagah link (a tag) hota hai
+    try:
+        link = page.locator('a[data-item-id^="phone:"]')
+        if link.count() > 0:
+            label = link.first.get_attribute("aria-label") or ""
+            label = label.replace("Phone:", "").strip()
+            if label:
+                return label
+    except Exception:
+        pass
+
+    # Strategy 3: data-tooltip attribute wala button (Google kabhi kabhi is naam se deta hai)
+    try:
+        tooltip_btn = page.locator('button[data-tooltip="Copy phone number"]')
+        if tooltip_btn.count() > 0:
+            label = tooltip_btn.first.get_attribute("aria-label") or ""
+            label = label.replace("Phone:", "").strip()
+            if label:
+                return label
+    except Exception:
+        pass
+
+    # Strategy 4: aakhri fallback - poore info panel ke text mein phone-jaisi
+    # digit pattern dhoondo (jab upar wale teeno selectors fail ho jayein)
+    try:
+        panel_text = page.locator('div[role="main"]').first.inner_text(timeout=3000)
+        match = re.search(r'(\+?\d[\d\-\s\(\)]{6,}\d)', panel_text)
+        if match:
+            return match.group(1).strip()
+    except Exception:
+        pass
+
+    return None
+
+
 def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
     try:
         page.goto(url, timeout=30000)
@@ -188,6 +238,15 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
 
         name_el = page.locator("h1").first
         business_name = name_el.inner_text(timeout=5000).strip() if name_el else "Unknown"
+
+        website = None
+        website_btn = page.get_by_role("link", name=re.compile("Website", re.I))
+        if website_btn.count() > 0:
+            website = website_btn.first.get_attribute("href")
+
+        # Phone number ab Reviews tab par click karne SE PEHLE nikal rahe hain,
+        # kyun ki tab switch hone ke baad ye info panel se gayab ho sakta hai
+        phone = get_phone_number(page)
 
         reviews_tab = page.get_by_role("tab", name=re.compile("Reviews", re.I))
         if reviews_tab.count() == 0:
@@ -229,17 +288,6 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
             review_text = review_text_el.inner_text(timeout=2000)
         except Exception:
             pass
-
-        website = None
-        website_btn = page.get_by_role("link", name=re.compile("Website", re.I))
-        if website_btn.count() > 0:
-            website = website_btn.first.get_attribute("href")
-
-        phone = None
-        phone_btn = page.locator('button[data-item-id^="phone:"]')
-        if phone_btn.count() > 0:
-            phone_label = phone_btn.first.get_attribute("aria-label") or ""
-            phone = phone_label.replace("Phone:", "").strip()
 
         return {
             "business_name": business_name,
