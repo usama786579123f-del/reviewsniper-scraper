@@ -151,6 +151,9 @@ jobs:
     env:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       DB_NAME: reviewsniper
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
 
     steps:
       - name: Check out the repo
@@ -319,6 +322,9 @@ jobs:
     env:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       DB_NAME: reviewsniper
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
 
     steps:
       - name: Check out the repo
