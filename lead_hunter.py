@@ -22,6 +22,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -37,6 +38,8 @@ DB_NAME = os.getenv("DB_NAME", "reviewsniper")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 ALERT_EMAIL_FROM = os.getenv("ALERT_EMAIL_FROM")
 ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO")
+
+EMAIL_REGEX = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 TIME_UNIT_TO_HOURS = {
     "minute": 1 / 60,
@@ -158,7 +161,7 @@ def scrape_niche(page, query: str, max_listings: int = 20):
         results_panel.wait_for(timeout=15000)
     except PWTimeout:
         save_debug(page, "no_results_panel")
-        print("[WARN] Results panel not found - Google Maps ne layout change kiya ho sakta hai, ya block screen dikha rahi hai.")
+        print("[WARN] Results panel not found - Google Maps ne layout change kiya ho sakta hai, ya blockscreen dikha rahi hai.")
         return []
 
     listing_links = set()
@@ -231,6 +234,163 @@ def get_phone_number(page) -> str | None:
     return None
 
 
+def get_website(page) -> str | None:
+    """Google Maps ka business website nikalta hai, kai strategies try
+    kar ke (Google apna markup baar baar badalta rehta hai)."""
+
+    # Strategy 1: sabse aam - role=link jiska visible name "Website" ho
+    try:
+        link = page.get_by_role("link", name=re.compile("Website", re.I))
+        if link.count() > 0:
+            href = link.first.get_attribute("href")
+            if href:
+                return href
+    except Exception:
+        pass
+
+    # Strategy 2: data-item-id="authority" wala link (Google ka internal naam)
+    try:
+        auth_link = page.locator('a[data-item-id="authority"]')
+        if auth_link.count() > 0:
+            href = auth_link.first.get_attribute("href")
+            if href:
+                return href
+    except Exception:
+        pass
+
+    # Strategy 3: aria-label "Website:" se shuru hone wala link
+    try:
+        aria_link = page.locator('a[aria-label^="Website:"]')
+        if aria_link.count() > 0:
+            href = aria_link.first.get_attribute("href")
+            if href:
+                return href
+    except Exception:
+        pass
+
+    # Strategy 4: data-tooltip="Open website" wala link
+    try:
+        tooltip_link = page.locator('a[data-tooltip="Open website"]')
+        if tooltip_link.count() > 0:
+            href = tooltip_link.first.get_attribute("href")
+            if href:
+                return href
+    except Exception:
+        pass
+
+    return None
+
+
+def get_review_text(first_review) -> str:
+    """Review ka text nikalta hai, kai selectors try kar ke. Kuch na
+    mile to khaali string deta hai (crash nahi karta)."""
+
+    # Strategy 1: jaisa pehle tha - span[jsan]
+    try:
+        el = first_review.locator('span[jsan]').first
+        text = el.inner_text(timeout=2000)
+        if text and text.strip():
+            return text.strip()
+    except Exception:
+        pass
+
+    # Strategy 2: Google review text ke liye jaana-pehchana class
+    try:
+        el = first_review.locator('span.wiI7pd').first
+        text = el.inner_text(timeout=2000)
+        if text and text.strip():
+            return text.strip()
+    except Exception:
+        pass
+
+    # Strategy 3: "More"/"Read more" button ke jitne bhi span parent hote
+    # hain unme se sabse lamba text wala span review text hota hai
+    # (naam, tareekh, star rating ke spans chhote hote hain)
+    try:
+        spans = first_review.locator("span")
+        count = spans.count()
+        best_text = ""
+        for i in range(count):
+            try:
+                candidate = spans.nth(i).inner_text(timeout=1000).strip()
+            except Exception:
+                continue
+            if len(candidate) > len(best_text) and len(candidate) > 15:
+                best_text = candidate
+        if best_text:
+            return best_text
+    except Exception:
+        pass
+
+    return ""
+
+
+def find_email_on_page(page) -> str | None:
+    """Pehle mailto: links dhoondo, na milen to page ke visible text mein
+    email-jaisa pattern dhoondo. Kuch na mile to None (kabhi fake email
+    mat banao)."""
+    try:
+        mailto_links = page.locator('a[href^="mailto:"]')
+        count = mailto_links.count()
+        for i in range(count):
+            href = mailto_links.nth(i).get_attribute("href") or ""
+            addr = href[len("mailto:"):].split("?")[0].strip()
+            if addr and EMAIL_REGEX.fullmatch(addr):
+                return addr
+    except Exception:
+        pass
+
+    try:
+        body_text = page.locator("body").inner_text(timeout=3000)
+        match = EMAIL_REGEX.search(body_text)
+        if match:
+            return match.group(0)
+    except Exception:
+        pass
+
+    return None
+
+
+def extract_email_from_website(page, website_url: str) -> str | None:
+    """Business ki website khol kar mailto: link ya visible email dhoondta
+    hai. Agar homepage par na mile, "Contact"/"About" jaisa link dhoond
+    kar us page par bhi try karta hai. Kuch na mile to None deta hai."""
+    if not website_url:
+        return None
+
+    try:
+        page.goto(website_url, timeout=20000, wait_until="domcontentloaded")
+        page.wait_for_timeout(1500)
+    except Exception as e:
+        print(f"[WARN] Could not open website {website_url}: {e}")
+        return None
+
+    email = find_email_on_page(page)
+    if email:
+        return email
+
+    contact_href = None
+    try:
+        contact_links = page.locator("a").filter(has_text=re.compile(r"contact|about", re.I))
+        if contact_links.count() > 0:
+            contact_href = contact_links.first.get_attribute("href")
+    except Exception:
+        pass
+
+    if contact_href:
+        try:
+            contact_url = urllib.parse.urljoin(website_url, contact_href)
+            page.goto(contact_url, timeout=20000, wait_until="domcontentloaded")
+            page.wait_for_timeout(1500)
+            email = find_email_on_page(page)
+            if email:
+                return email
+        except Exception as e:
+            print(f"[WARN] Could not open contact/about page for {website_url}: {e}")
+
+    return None
+
+
 def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
     try:
         page.goto(url, timeout=30000)
@@ -239,10 +399,7 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
         name_el = page.locator("h1").first
         business_name = name_el.inner_text(timeout=5000).strip() if name_el else "Unknown"
 
-        website = None
-        website_btn = page.get_by_role("link", name=re.compile("Website", re.I))
-        if website_btn.count() > 0:
-            website = website_btn.first.get_attribute("href")
+        website = get_website(page)
 
         # Phone number ab Reviews tab par click karne SE PEHLE nikal rahe hain,
         # kyun ki tab switch hone ke baad ye info panel se gayab ho sakta hai
@@ -282,12 +439,19 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
         if stars not in TARGET_STARS or hours_ago > CRISIS_WINDOW_HOURS:
             return None
 
-        review_text_el = first_review.locator('span[jsan]').first
-        review_text = ""
-        try:
-            review_text = review_text_el.inner_text(timeout=2000)
-        except Exception:
-            pass
+        review_text = get_review_text(first_review)
+
+        # Website Google Maps se mil chuki hai, phone/reviews bhi - ab is
+        # website ko khol kar email dhoondte hain (ye Maps se hat kar
+        # asli website par jayega, is liye SABSE AAKHIR mein karna zaroori
+        # hai, warna baaki Maps data uske baad nahi mil sakega)
+        email = None
+        if website:
+            try:
+                email = extract_email_from_website(page, website)
+            except Exception as e:
+                print(f"[WARN] Email extraction failed for {website}: {e}")
+                email = None
 
         return {
             "business_name": business_name,
@@ -295,6 +459,7 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
             "maps_url": url,
             "website": website,
             "phone": phone,
+            "email": email,
             "stars": stars,
             "review_text": review_text.strip(),
             "hours_ago": round(hours_ago, 1),
@@ -326,6 +491,7 @@ def send_alert_email(lead: dict) -> tuple[bool, str]:
       <p><strong>Rating:</strong> {lead['stars']} star ({lead['hours_ago']}h ago)</p>
       <p><strong>Review:</strong> {lead['review_text'] or '(no text)'}</p>
       <p><strong>Phone:</strong> {lead['phone'] or 'N/A'}</p>
+      <p><strong>Email:</strong> {lead.get('email') or 'N/A'}</p>
       <p><strong>Website:</strong> {lead['website'] or 'N/A'}</p>
       <p><a href="{lead['maps_url']}">View on Google Maps</a></p>
     </div>
