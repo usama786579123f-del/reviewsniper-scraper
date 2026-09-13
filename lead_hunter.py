@@ -475,34 +475,49 @@ def check_listing_for_crisis(page, url: str, niche: str) -> dict | None:
         return None
 
 
-def send_alert_email(lead: dict) -> tuple[bool, str]:
-    """Brevo ke Transactional Email API se ek alert email bhejta hai.
-    Return: (success, error_message). Agar keys set nahi hain to
-    (False, "not configured") deta hai, taake caller graceful handle kar sake."""
-    if not (BREVO_API_KEY and ALERT_EMAIL_FROM and ALERT_EMAIL_TO):
-        return False, "BREVO_API_KEY / ALERT_EMAIL_FROM / ALERT_EMAIL_TO env vars missing"
+def send_outreach_email(lead: dict) -> tuple[str, str]:
+    """Business ko (jiski email Task 8 mein mili thi) seedha ek outreach
+    email bhejta hai, unke is specific bad review ka ek free sample
+    jawab likhne ki offer ke sath.
+    Return: (status, error) - status "sent" | "skipped" | "failed".
+    "skipped" tab jab is lead ki koi email hi na mili ho."""
+    to_email = lead.get("email")
+    if not to_email:
+        return "skipped", "no email found for this lead"
 
-    subject = f"[ReviewSniper] New crisis lead: {lead['business_name']} ({lead['stars']} star)"
+    if not (BREVO_API_KEY and ALERT_EMAIL_FROM):
+        return "failed", "BREVO_API_KEY / ALERT_EMAIL_FROM env vars missing"
+
+    subject = f"About your recent review - free help from ReviewSniper"
+
+    review_snippet = lead["review_text"] or "a recent customer review"
+
     html_content = f"""
     <div style="font-family: Arial, sans-serif; font-size: 14px; color: #222;">
-      <h2 style="margin-bottom: 4px;">New Crisis Lead Found</h2>
-      <p><strong>Business:</strong> {lead['business_name']}</p>
-      <p><strong>Niche:</strong> {lead['niche']}</p>
-      <p><strong>Rating:</strong> {lead['stars']} star ({lead['hours_ago']}h ago)</p>
-      <p><strong>Review:</strong> {lead['review_text'] or '(no text)'}</p>
-      <p><strong>Phone:</strong> {lead['phone'] or 'N/A'}</p>
-      <p><strong>Email:</strong> {lead.get('email') or 'N/A'}</p>
-      <p><strong>Website:</strong> {lead['website'] or 'N/A'}</p>
-      <p><a href="{lead['maps_url']}">View on Google Maps</a></p>
+      <p>Hi,</p>
+      <p>I noticed <strong>{lead['business_name']}</strong> recently received a
+        {lead['stars']}-star review ({lead['hours_ago']} hours ago) that said:</p>
+      <blockquote style="margin: 12px 0; padding: 8px 12px; border-left: 3px solid #ccc; color: #555;">
+        {review_snippet}
+      </blockquote>
+      <p>I help businesses respond to reviews like this professionally. As a
+        free sample, I would be happy to write a reply to this specific
+        review for you at no cost, no obligation.</p>
+      <p>If that is useful, just reply to this email and I will send it over.
+        If you would like ongoing help managing your reviews after that, we
+        can discuss a simple monthly plan.</p>
+      <p>Best,<br>ReviewSniper</p>
     </div>
     """
 
     payload = {
-        "sender": {"email": ALERT_EMAIL_FROM, "name": "ReviewSniper Alerts"},
-        "to": [{"email": ALERT_EMAIL_TO}],
+        "sender": {"email": ALERT_EMAIL_FROM, "name": "ReviewSniper"},
+        "to": [{"email": to_email}],
         "subject": subject,
         "htmlContent": html_content,
     }
+    if ALERT_EMAIL_TO:
+        payload["replyTo"] = {"email": ALERT_EMAIL_TO}
 
     req = urllib.request.Request(
         "https://api.brevo.com/v3/smtp/email",
@@ -518,24 +533,25 @@ def send_alert_email(lead: dict) -> tuple[bool, str]:
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             resp.read()
-        return True, ""
+        return "sent", ""
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
-        return False, f"HTTP {e.code}: {body}"
+        return "failed", f"HTTP {e.code}: {body}"
     except Exception as e:
-        return False, str(e)
+        return "failed", str(e)
 
 
-def log_email_alert(db, lead: dict, success: bool, error: str = ""):
-    """Har email attempt (kamyaab ya nakaam) ko 'email_alerts' collection
-    mein save karta hai, taake EmailAlerts.tsx real history dikha sake."""
+def log_email_alert(db, lead: dict, status: str, error: str = "", recipient: str = ""):
+    """Har outreach attempt (sent, skipped, ya failed) ko 'email_alerts'
+    collection mein save karta hai, taake EmailAlerts.tsx real history
+    dikha sake."""
     db["email_alerts"].insert_one(
         {
             "business_name": lead["business_name"],
             "niche": lead["niche"],
             "maps_url": lead["maps_url"],
-            "recipient": ALERT_EMAIL_TO or "",
-            "status": "sent" if success else "failed",
+            "recipient": recipient,
+            "status": status,
             "error": error,
             "sent_at": datetime.now(timezone.utc),
         }
@@ -551,12 +567,14 @@ def save_lead(db, lead: dict):
     leads.insert_one(lead)
     print(f"[SAVED] {lead['business_name']} ({lead['stars']}*, {lead['hours_ago']}h ago)")
 
-    success, error = send_alert_email(lead)
-    log_email_alert(db, lead, success, error)
-    if success:
-        print(f"[EMAIL] Alert sent for {lead['business_name']}")
+    status, error = send_outreach_email(lead)
+    log_email_alert(db, lead, status, error, recipient=lead.get("email") or "")
+    if status == "sent":
+        print(f"[EMAIL] Outreach sent to {lead.get('email')} for {lead['business_name']}")
+    elif status == "skipped":
+        print(f"[EMAIL] Skipped (no email found) for {lead['business_name']}")
     else:
-        print(f"[EMAIL] Alert NOT sent for {lead['business_name']}: {error}")
+        print(f"[EMAIL] Outreach FAILED for {lead['business_name']}: {error}")
 
 
 def run(query: str, max_listings: int):
